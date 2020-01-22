@@ -17,34 +17,36 @@ class EarleyAlgorithm:
                 pass
 
     @classmethod
-    def complete(cls, d: List[Set[Situation]], pos: int):
-        updated_situations: List[Situation] = []
-        for situation in d[pos]:
+    def complete(cls, d: List[Set[Situation]], situations: Set[Situation],
+                 updated_situations: Set[Situation], pos: int):
+        for situation in situations:
             if situation.dot_position != len(situation.rule.next):
                 continue
             for new_situation in d[situation.index]:
                 try:
                     if situation.rule.start == new_situation.rule.next[new_situation.dot_position]:
-                        updated_situations.append(Situation(new_situation.rule,
-                                                            new_situation.dot_position + 1,
-                                                            new_situation.index))
+                        current_situation = Situation(new_situation.rule,
+                                                      new_situation.dot_position + 1,
+                                                      new_situation.index)
+                        if current_situation not in d[pos]:
+                            updated_situations.add(current_situation)
                 except Exception as e:
                     pass
-        for situation in updated_situations:
-            d[pos].add(situation)
 
     @classmethod
-    def predict(cls, g: List[Rule], d: List[Set[Situation]], pos: int):
-        updated_situations: List[Situation] = []
-        for situation in d[pos]:
+    def predict(cls, g: List[Rule], d: List[Set[Situation]], situations: Set[Situation],
+                updated_situations: Set[Situation], pos: int):
+        for situation in situations:
+            if situation.dot_position >= len(situation.rule.next):
+                continue
             for rule in g:
                 try:
                     if rule.start == situation.rule.next[situation.dot_position]:
-                        updated_situations.append(Situation(rule, 0, pos))
+                        current_situation = Situation(rule, 0, pos)
+                        if current_situation not in d[pos]:
+                            updated_situations.add(current_situation)
                 except Exception as e:
                     pass
-        for situation in updated_situations:
-            d[pos].add(situation)
 
     @classmethod
     def run(cls, g: List[Rule], w: str):
@@ -52,12 +54,20 @@ class EarleyAlgorithm:
         d[0].add(Situation(Rule('S', 'X'), 0, 0))
         for i in range(len(w) + 1):
             cls.scan(d, w, i - 1)
-            while True:
-                check = len(d[i])
-                cls.complete(d, i)
-                cls.predict(g, d, i)
-                if check == len(d[i]):
-                    break
+            new_situations: Set[Situation] = set()
+            old_situations: Set[Situation] = set()
+            cls.complete(d, d[i], new_situations, i)
+            cls.predict(g, d, d[i], new_situations, i)
+            while len(new_situations) > 0:
+                for situation in new_situations:
+                    d[i].add(situation)
+                    old_situations.add(situation)
+                new_situations = set()
+                cls.complete(d, old_situations, new_situations, i)
+                cls.predict(g, d, old_situations, new_situations, i)
+                old_situations = new_situations
+            for situation in old_situations:
+                d[i].add(situation)
         if Situation(Rule('S', 'X'), 1, 0) in d[len(w)]:
             return True
         else:
